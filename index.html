@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Notifications</title>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+    <style>
+        #user_id{
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-group">
+            <input class="form-control" type="text" id="user_id"  placeholder="Enter your user_id">
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        $(function() {
+            var user_id,
+                conn = new WebSocket("ws://localhost:7788/ws");
+            $('#user_id').change(function(){
+                user_id = $(this).val();
+                conn.send(user_id)
+            });
+
+            conn.onmessage = function(evt) {
+                $('.container').append($('<div class="alert alert-success alert-dismissible" role="alert">\
+                                            <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + evt.data + '.</div>'))
+            }
+
+        });
+    </script>
+</body>
+</html>
