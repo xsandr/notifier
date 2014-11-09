@@ -14,11 +14,14 @@ import (
 
 var (
 	debug    = flag.Bool("debug", false, "Debug allow serve index page")
+	ssl      = flag.Bool("ssl", true, "SSL usage")
 	addr     = flag.String("addr", ":5000", "ws service address")
 	rabbit   = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
 	exchange = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
 	queue    = flag.String("queue", "notifications", "Queue name")
 	routing  = flag.String("routing key", "user.*", "Routing key for queue")
+	certFile = flag.String("cert", "", "Cert for TLS")
+	keyFile  = flag.String("keyfile", "", "Key for TLS")
 	re       = regexp.MustCompile("user.(\\d+)")
 
 	homeTempl = template.Must(template.ParseFiles("index.html"))
@@ -111,8 +114,9 @@ func main() {
 		http.HandleFunc("/", serveMain)
 	}
 	http.HandleFunc("/ws", serveWs)
-	err := http.ListenAndServe(*addr, nil)
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+	if *ssl {
+		http.ListenAndServeTLS(*addr, *certFile, *keyFile, nil)
+	} else {
+		http.ListenAndServe(*addr, nil)
 	}
 }
