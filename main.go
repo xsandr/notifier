@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	debug    = flag.Bool("debug", false, "Debug allow serve index page")
 	addr     = flag.String("addr", ":7788", "ws service address")
 	rabbit   = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
 	exchange = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
@@ -106,7 +107,9 @@ func serveMain(w http.ResponseWriter, r *http.Request) {
 func main() {
 	flag.Parse()
 	go registry.ListenRabbit()
-	http.HandleFunc("/", serveMain)
+	if *debug {
+		http.HandleFunc("/", serveMain)
+	}
 	http.HandleFunc("/ws", serveWs)
 	err := http.ListenAndServe(*addr, nil)
 	if err != nil {
