@@ -14,7 +14,7 @@ import (
 
 var (
 	debug    = flag.Bool("debug", false, "Debug allow serve index page")
-	addr     = flag.String("addr", ":7788", "ws service address")
+	addr     = flag.String("addr", ":5000", "ws service address")
 	rabbit   = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
 	exchange = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
 	queue    = flag.String("queue", "notifications", "Queue name")

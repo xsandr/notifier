@@ -21,7 +21,7 @@
     <script type="text/javascript">
         $(function() {
             var user_id,
-                conn = new WebSocket("ws://localhost:7788/ws");
+                conn = new WebSocket("ws://localhost:5000/ws");
             $('#user_id').change(function(){
                 user_id = $(this).val();
                 conn.send(user_id)
