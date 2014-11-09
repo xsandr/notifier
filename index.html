@@ -20,18 +20,36 @@
 
     <script type="text/javascript">
         $(function() {
-            var user_id,
-                conn = new WebSocket("ws://localhost:5000/ws");
+            var user_id;
             $('#user_id').change(function(){
                 user_id = $(this).val();
-                conn.send(user_id)
+                notifyMe();
             });
 
-            conn.onmessage = function(evt) {
-                $('.container').append($('<div class="alert alert-success alert-dismissible" role="alert">\
-                                            <button type="button" class="close" data-dismiss="alert"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>' + evt.data + '.</div>'))
+            if (!("Notification" in window) || !("WebSocket" in window)) {
+                return
             }
+            var notifyMe = function(){
+                var notification_connection = new WebSocket("ws://localhost:5000/ws");
 
+                notification_connection.onopen = function(){
+                    notification_connection.send(user_id);
+                }
+                notification_connection.onmessage = function(evt) {
+                    new Notification('Notification:', {
+                        body: evt.data
+                    })
+                }
+            }
+            if (Notification.permission === "granted") {
+                notifyMe();
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission(function (permission) {
+                    if (permission === "granted") {
+                        notifyMe();
+                    }
+                });
+            }
         });
     </script>
 </body>
