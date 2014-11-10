@@ -38,7 +38,14 @@ type UserConnection struct {
 }
 
 func (user_connection *UserConnection) Listen() {
-	defer user_connection.ws.Close()
+	defer func() {
+		user_connection.ws.Close()
+		if user_connection.UserId != 0 {
+			registry.Unregister(user_connection)
+			log.Printf("User %d leave ", user_connection.UserId)
+		}
+	}()
+
 	for {
 		_, message, err := user_connection.ws.ReadMessage()
 		if err != nil {
@@ -51,13 +58,11 @@ func (user_connection *UserConnection) Listen() {
 		registry.Register(user_connection)
 		log.Printf("User %d registred ", user_connection.UserId)
 	}
-	registry.Unregister(user_connection.UserId)
-	log.Printf("User %d leave ", user_connection.UserId)
 }
 
 type Regestry struct {
 	sync.RWMutex
-	connections map[int]*UserConnection
+	connections map[int][]*UserConnection
 }
 
 func (registry Regestry) ListenRabbit() {
@@ -69,7 +74,7 @@ func (registry Regestry) ListenRabbit() {
 		}
 		user_id, _ := strconv.Atoi(matches[len(matches)-1])
 		log.Printf("Message for user  %d: '%s'", user_id, string(message.Body))
-		ws_connection, ok := registry.connections[user_id]
+		ws_connection, ok := registry.GetConnection(user_id)
 		if ok == false {
 			log.Printf("But user %d not connected", user_id)
 			continue
@@ -78,19 +83,39 @@ func (registry Regestry) ListenRabbit() {
 	}
 }
 
+func (registry Regestry) GetConnection(user_id int) (*UserConnection, bool) {
+	registry.Lock()
+	defer registry.Unlock()
+	ws_connections, ok := registry.connections[user_id]
+	if ok == false || len(ws_connections) == 0 {
+		return nil, false
+	}
+	return ws_connections[0], true
+}
+
 func (registry Regestry) Register(uc *UserConnection) {
 	registry.Lock()
-	registry.connections[uc.UserId] = uc
-	registry.Unlock()
+	defer registry.Unlock()
+	if _, ok := registry.connections[uc.UserId]; ok == false {
+		registry.connections[uc.UserId] = make([]*UserConnection, 0)
+	}
+	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
 }
 
-func (registry Regestry) Unregister(user_id int) {
+func (registry Regestry) Unregister(uc *UserConnection) {
 	registry.Lock()
-	delete(registry.connections, user_id)
+	var index int = 0
+	for i := 0; i < len(registry.connections[uc.UserId]); i++ {
+		if registry.connections[uc.UserId][i] == uc {
+			index = i
+			break
+		}
+	}
+	registry.connections[uc.UserId] = append(registry.connections[uc.UserId][:index], registry.connections[uc.UserId][index+1:]...)
 	registry.Unlock()
 }
 
-var registry = Regestry{connections: make(map[int]*UserConnection)}
+var registry = Regestry{connections: make(map[int][]*UserConnection)}
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
