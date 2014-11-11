@@ -29,7 +29,6 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			log.Printf("Request url %v", r.URL)
 			return true
 		},
 	}
@@ -76,10 +75,9 @@ func (registry Regestry) ListenRabbit() {
 			continue
 		}
 		user_id, _ := strconv.Atoi(matches[len(matches)-1])
-		log.Printf("Message for user  %d: '%s'", user_id, string(message.Body))
 		ws_connection, ok := registry.GetConnection(user_id)
+		log.Printf("Message for user(online - %v) %d: '%s'", ok, user_id, string(message.Body))
 		if ok == false {
-			log.Printf("But user %d not connected", user_id)
 			continue
 		}
 		ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
