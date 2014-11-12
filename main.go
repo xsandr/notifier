@@ -14,7 +14,7 @@ import (
 
 var (
 	debug    = flag.Bool("debug", false, "Debug allow serve index page")
-	ssl      = flag.Bool("ssl", true, "SSL usage")
+	ssl      = flag.Bool("ssl", false, "SSL usage")
 	addr     = flag.String("addr", ":5000", "ws service address")
 	rabbit   = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
 	exchange = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
@@ -67,7 +67,7 @@ type Regestry struct {
 	connections map[int][]*UserConnection
 }
 
-func (registry Regestry) ListenRabbit() {
+func (registry *Regestry) ListenRabbit() {
 	for message := range GetMessagesChannel() {
 		message.Ack(false)
 		matches := re.FindStringSubmatch(message.RoutingKey)
@@ -84,7 +84,7 @@ func (registry Regestry) ListenRabbit() {
 	}
 }
 
-func (registry Regestry) GetConnection(user_id int) (*UserConnection, bool) {
+func (registry *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
 	registry.Lock()
 	defer registry.Unlock()
 	ws_connections, ok := registry.connections[user_id]
@@ -94,7 +94,7 @@ func (registry Regestry) GetConnection(user_id int) (*UserConnection, bool) {
 	return ws_connections[0], true
 }
 
-func (registry Regestry) Register(uc *UserConnection) {
+func (registry *Regestry) Register(uc *UserConnection) {
 	registry.Lock()
 	defer registry.Unlock()
 	if _, ok := registry.connections[uc.UserId]; ok == false {
@@ -103,7 +103,7 @@ func (registry Regestry) Register(uc *UserConnection) {
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
 }
 
-func (registry Regestry) Unregister(uc *UserConnection) {
+func (registry *Regestry) Unregister(uc *UserConnection) {
 	registry.Lock()
 	var index int = 0
 	for i := 0; i < len(registry.connections[uc.UserId]); i++ {
@@ -116,7 +116,7 @@ func (registry Regestry) Unregister(uc *UserConnection) {
 	registry.Unlock()
 }
 
-var registry = Regestry{connections: make(map[int][]*UserConnection)}
+var registry = &Regestry{connections: make(map[int][]*UserConnection)}
 
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
