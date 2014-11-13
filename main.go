@@ -33,7 +33,8 @@ var (
 			return true
 		},
 	}
-	connectionsCount = expvar.NewInt("active users")
+	usersCount       = expvar.NewInt("active users")
+	connectionsCount = expvar.NewInt("active connections")
 )
 
 type UserConnection struct {
@@ -99,8 +100,9 @@ func (registry *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
 func (registry *Regestry) Register(uc *UserConnection) {
 	registry.Lock()
 	defer registry.Unlock()
+	connectionsCount.Add(1)
 	if _, ok := registry.connections[uc.UserId]; ok == false {
-		connectionsCount.Add(1)
+		usersCount.Add(1)
 		registry.connections[uc.UserId] = make([]*UserConnection, 0)
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
@@ -109,6 +111,7 @@ func (registry *Regestry) Register(uc *UserConnection) {
 func (registry *Regestry) Unregister(uc *UserConnection) {
 	registry.Lock()
 	var index int = 0
+
 	for i := 0; i < len(registry.connections[uc.UserId]); i++ {
 		if registry.connections[uc.UserId][i] == uc {
 			index = i
@@ -116,8 +119,10 @@ func (registry *Regestry) Unregister(uc *UserConnection) {
 		}
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId][:index], registry.connections[uc.UserId][index+1:]...)
+
+	connectionsCount.Add(-1)
 	if len(registry.connections[uc.UserId]) == 0 {
-		connectionsCount.Add(-1)
+		usersCount.Add(-1)
 	}
 	registry.Unlock()
 }
