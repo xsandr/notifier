@@ -1,6 +1,7 @@
 package main
 
 import (
+	"expvar"
 	"flag"
 	"log"
 	"net/http"
@@ -32,6 +33,7 @@ var (
 			return true
 		},
 	}
+	connectionsCount = expvar.NewInt("active users")
 )
 
 type UserConnection struct {
@@ -98,6 +100,7 @@ func (registry *Regestry) Register(uc *UserConnection) {
 	registry.Lock()
 	defer registry.Unlock()
 	if _, ok := registry.connections[uc.UserId]; ok == false {
+		connectionsCount.Add(1)
 		registry.connections[uc.UserId] = make([]*UserConnection, 0)
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
@@ -113,6 +116,9 @@ func (registry *Regestry) Unregister(uc *UserConnection) {
 		}
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId][:index], registry.connections[uc.UserId][index+1:]...)
+	if len(registry.connections[uc.UserId]) == 0 {
+		connectionsCount.Add(-1)
+	}
 	registry.Unlock()
 }
 
