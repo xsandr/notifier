@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"strconv"
 
 	"github.com/gorilla/websocket"
@@ -17,7 +16,6 @@ func (user_connection *UserConnection) Listen() {
 		user_connection.ws.Close()
 		if user_connection.UserId != 0 {
 			registry.Unregister(user_connection)
-			log.Printf("User %d leave ", user_connection.UserId)
 		}
 	}()
 
@@ -31,6 +29,5 @@ func (user_connection *UserConnection) Listen() {
 			continue
 		}
 		registry.Register(user_connection)
-		log.Printf("User %d registred ", user_connection.UserId)
 	}
 }

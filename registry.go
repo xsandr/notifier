@@ -47,6 +47,7 @@ func (registry *Regestry) Register(uc *UserConnection) {
 	if _, ok := registry.connections[uc.UserId]; ok == false {
 		usersCount.Add(1)
 		registry.connections[uc.UserId] = make([]*UserConnection, 0)
+		log.Printf("User %d registred ", uc.UserId)
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
 }
@@ -66,6 +67,8 @@ func (registry *Regestry) Unregister(uc *UserConnection) {
 	connectionsCount.Add(-1)
 	if len(registry.connections[uc.UserId]) == 0 {
 		usersCount.Add(-1)
+		delete(registry.connections, uc.UserId)
+		log.Printf("User %d leave ", uc.UserId)
 	}
 	registry.Unlock()
 }
