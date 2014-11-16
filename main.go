@@ -21,7 +21,7 @@ var (
 	routing     = flag.String("routing key", "user.*", "Routing key for queue")
 	certFile    = flag.String("cert", "", "Cert for TLS")
 	keyFile     = flag.String("keyfile", "", "Key for TLS")
-	defatul_ttl = flag.Int64("ttl", 86400000, "default TTL for undelivered message (msec)")
+	defatul_ttl = flag.Int64("ttl", 3*86400000, "default TTL for undelivered message (msec)")
 
 	re = regexp.MustCompile("user.(\\d+)")
 
