@@ -14,9 +14,7 @@ type UserConnection struct {
 func (user_connection *UserConnection) Listen() {
 	defer func() {
 		user_connection.ws.Close()
-		if user_connection.UserId != 0 {
-			registry.Unregister(user_connection)
-		}
+		registry.Unregister(user_connection)
 	}()
 
 	for {
@@ -28,6 +26,19 @@ func (user_connection *UserConnection) Listen() {
 		if err != nil {
 			continue
 		}
-		registry.Register(user_connection)
+		messages_channel, connection := GetUndeliveredMessage(user_connection.UserId)
+		defer connection.Close()
+
+		if is_new_user := registry.Register(user_connection); is_new_user {
+			messages := make(chan []byte)
+			go func() {
+				defer close(messages)
+				for m := range messages_channel {
+					messages <- m.Body
+					m.Ack(false)
+				}
+			}()
+			go registry.SendUndeliveredMessages(user_connection.UserId, messages)
+		}
 	}
 }

@@ -12,16 +12,18 @@ import (
 )
 
 var (
-	debug    = flag.Bool("debug", false, "Debug allow serve index page")
-	ssl      = flag.Bool("ssl", false, "SSL usage")
-	addr     = flag.String("addr", ":5000", "ws service address")
-	rabbit   = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
-	exchange = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
-	queue    = flag.String("queue", "notifications", "Queue name")
-	routing  = flag.String("routing key", "user.*", "Routing key for queue")
-	certFile = flag.String("cert", "", "Cert for TLS")
-	keyFile  = flag.String("keyfile", "", "Key for TLS")
-	re       = regexp.MustCompile("user.(\\d+)")
+	debug       = flag.Bool("debug", false, "Debug allow serve index page")
+	ssl         = flag.Bool("ssl", false, "SSL usage")
+	addr        = flag.String("addr", ":5000", "ws service address")
+	rabbit      = flag.String("rabbit", "amqp://guest:guest@localhost:5672/", "AMQP URI")
+	exchange    = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
+	queue       = flag.String("queue", "notifications", "Queue name")
+	routing     = flag.String("routing key", "user.*", "Routing key for queue")
+	certFile    = flag.String("cert", "", "Cert for TLS")
+	keyFile     = flag.String("keyfile", "", "Key for TLS")
+	defatul_ttl = flag.Int64("ttl", 86400000, "default TTL for undelivered message (msec)")
+
+	re = regexp.MustCompile("user.(\\d+)")
 
 	homeTempl = template.Must(template.ParseFiles("index.html"))
 	upgrader  = websocket.Upgrader{
@@ -44,7 +46,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user_connection := &UserConnection{ws: ws}
-	go user_connection.Listen()
+	user_connection.Listen()
 }
 
 func serveMain(w http.ResponseWriter, r *http.Request) {
