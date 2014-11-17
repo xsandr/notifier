@@ -20,7 +20,10 @@ and then
 ```
 from universalbus import EventSender
 sender = EventSender('guest', 'guest', 'localhost', '/', exchange='notifications')
-sender.push_text('user.15', 'notification example')  # instead 15, enter your ID
+sender.push_text('user.15', 'notification example', ttl=15*60)  # instead 15, enter your ID
 ```
 
 
+## Offline notifications
+
+For offline users, notifications will be moved into personal queue, and delivered after user log in.
