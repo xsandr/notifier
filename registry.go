@@ -40,6 +40,7 @@ func (registry *Regestry) ListenRabbit() {
 func (registry *Regestry) SendUndeliveredMessages(user_id int, messages chan []byte) {
 	for message := range messages {
 		if ws_connection, ok := registry.GetConnection(user_id); ok {
+			log.Printf("Message for user(is online - %v) %d: '%s'", ok, user_id, string(message))
 			ws_connection.ws.WriteMessage(websocket.TextMessage, message)
 		}
 	}
