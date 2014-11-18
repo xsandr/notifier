@@ -22,7 +22,7 @@ func (registry *Regestry) ListenRabbit() {
 		}
 		user_id, _ := strconv.Atoi(matches[len(matches)-1])
 		ws_connection, ok := registry.GetConnection(user_id)
-		log.Printf("Message for user(online - %v) %d: '%s'", ok, user_id, string(message.Body))
+		log.Printf("Message for user(is online - %v) %d: '%s'", ok, user_id, string(message.Body))
 		if ok == false && *defatul_ttl > 0 {
 			ttl := *defatul_ttl
 			if ttl_header, ok := message.Headers["ttl"]; ok && ttl_header != nil {
@@ -64,16 +64,13 @@ func (registry *Regestry) Register(uc *UserConnection) bool {
 		usersCount.Add(1)
 		first_connection = true
 		registry.connections[uc.UserId] = make([]*UserConnection, 0)
-		log.Printf("User %d registred ", uc.UserId)
 	}
 	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
-	log.Printf("User registred %d", len(registry.connections[uc.UserId]))
 	return first_connection
 }
 
 func (registry *Regestry) Unregister(uc *UserConnection) {
 	registry.Lock()
-	log.Printf("User %d unregistred %d", uc.UserId, len(registry.connections[uc.UserId]))
 	if _, ok := registry.connections[uc.UserId]; ok {
 		var index int = 0
 		for i := 0; i < len(registry.connections[uc.UserId]); i++ {
@@ -85,7 +82,6 @@ func (registry *Regestry) Unregister(uc *UserConnection) {
 		registry.connections[uc.UserId] = append(registry.connections[uc.UserId][:index], registry.connections[uc.UserId][index+1:]...)
 
 		connectionsCount.Add(-1)
-		log.Printf("User %d leave ", uc.UserId)
 		if len(registry.connections[uc.UserId]) == 0 {
 			usersCount.Add(-1)
 			delete(registry.connections, uc.UserId)
