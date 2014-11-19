@@ -31,9 +31,9 @@ func (registry *Regestry) ListenRabbit() {
 				}
 			}
 			PublishUndeliveredMessage(user_id, message.Body, ttl)
-			continue
+		} else {
+			ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
 		}
-		ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
 	}
 }
 
