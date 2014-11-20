@@ -9,12 +9,15 @@ import (
 type UserConnection struct {
 	UserId int
 	ws     *websocket.Conn
+	active bool
 }
 
 func (user_connection *UserConnection) Listen() {
 	defer func() {
 		user_connection.ws.Close()
-		registry.Unregister(user_connection)
+		if user_connection.active {
+			registry.Unregister(user_connection)
+		}
 	}()
 
 	for {
@@ -26,6 +29,7 @@ func (user_connection *UserConnection) Listen() {
 		if err != nil {
 			continue
 		}
+		user_connection.active = true
 		messages_channel, connection := GetUndeliveredMessage(user_connection.UserId)
 		defer connection.Close()
 

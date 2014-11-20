@@ -40,7 +40,7 @@ func (registry *Regestry) ListenRabbit() {
 func (registry *Regestry) SendUndeliveredMessages(user_id int, messages chan []byte) {
 	for message := range messages {
 		if ws_connection, ok := registry.GetConnection(user_id); ok {
-			log.Printf("Message for user(is online - %v) %d: '%s'", ok, user_id, string(message))
+			log.Printf("Undelivered message for user(is online - %v) %d: '%s'", ok, user_id, string(message))
 			ws_connection.ws.WriteMessage(websocket.TextMessage, message)
 		}
 	}
@@ -50,6 +50,7 @@ func (registry *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
 	registry.Lock()
 	defer registry.Unlock()
 	ws_connections, ok := registry.connections[user_id]
+	log.Printf("User %d have %d active connection", user_id, len(ws_connections))
 	if ok == false || len(ws_connections) == 0 {
 		return nil, false
 	}
@@ -60,6 +61,7 @@ func (registry *Regestry) Register(uc *UserConnection) bool {
 	registry.Lock()
 	defer registry.Unlock()
 	connectionsCount.Add(1)
+	log.Printf("User %d: register", uc.UserId)
 	first_connection := false
 	if _, ok := registry.connections[uc.UserId]; ok == false {
 		usersCount.Add(1)
@@ -72,6 +74,7 @@ func (registry *Regestry) Register(uc *UserConnection) bool {
 
 func (registry *Regestry) Unregister(uc *UserConnection) {
 	registry.Lock()
+	log.Printf("User %d: unregister", uc.UserId)
 	if _, ok := registry.connections[uc.UserId]; ok {
 		var index int = 0
 		for i := 0; i < len(registry.connections[uc.UserId]); i++ {
@@ -86,7 +89,6 @@ func (registry *Regestry) Unregister(uc *UserConnection) {
 		if len(registry.connections[uc.UserId]) == 0 {
 			usersCount.Add(-1)
 			delete(registry.connections, uc.UserId)
-
 		}
 	}
 	registry.Unlock()

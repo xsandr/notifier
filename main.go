@@ -45,7 +45,7 @@ func serveWs(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	user_connection := &UserConnection{ws: ws}
+	user_connection := &UserConnection{ws: ws, active: false}
 	user_connection.Listen()
 }
 
