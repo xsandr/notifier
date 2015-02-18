@@ -19,9 +19,10 @@ var (
 	exchange    = flag.String("exchange", "notifications", "Durable, non-auto-deleted AMQP exchange name")
 	queue       = flag.String("queue", "notifications", "Queue name")
 	routing     = flag.String("routing key", "user.*", "Routing key for queue")
-	certFile    = flag.String("cert", "", "Cert for TLS")
-	keyFile     = flag.String("keyfile", "", "Key for TLS")
 	defatul_ttl = flag.Int64("ttl", 3*86400000, "default TTL for undelivered message (msec)")
+
+	certFile = flag.String("cert", "", "Cert for TLS")
+	keyFile  = flag.String("keyfile", "", "Key for TLS")
 
 	re = regexp.MustCompile("user.(\\d+)")
 
