@@ -64,10 +64,8 @@ func main() {
 	http.HandleFunc("/ws", serveWs)
 	log.Print("Server started")
 	if *ssl {
-		err := http.ListenAndServeTLS(*addr, *certFile, *keyFile, nil)
-		check_error(err)
+		log.Fatal(http.ListenAndServeTLS(*addr, *certFile, *keyFile, nil))
 	} else {
-		err := http.ListenAndServe(*addr, nil)
-		check_error(err)
+		log.Fatal(http.ListenAndServe(*addr, nil))
 	}
 }

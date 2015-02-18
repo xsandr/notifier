@@ -6,15 +6,19 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/streadway/amqp"
 )
 
 type Regestry struct {
 	sync.RWMutex
+	connection  *amqp.Connection
 	connections map[int][]*UserConnection
 }
 
 func (registry *Regestry) ListenRabbit() {
-	for message := range GetMessagesChannel() {
+	message_delivery, connection := GetMessagesChannel()
+	registry.connection = connection
+	for message := range message_delivery {
 		message.Ack(false)
 		matches := re.FindStringSubmatch(message.RoutingKey)
 		if len(matches) == 0 {
@@ -30,13 +34,14 @@ func (registry *Regestry) ListenRabbit() {
 					ttl = int64(ttl_int)
 				}
 			}
-			PublishUndeliveredMessage(user_id, message.Body, ttl)
+			PublishUndeliveredMessage(connection, user_id, message.Body, ttl)
 		} else {
 			ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
 		}
 	}
 }
 
+// Sending undelivered messages through WS
 func (registry *Regestry) SendUndeliveredMessages(user_id int, messages chan []byte) {
 	for message := range messages {
 		if ws_connection, ok := registry.GetConnection(user_id); ok {

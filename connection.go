@@ -32,7 +32,7 @@ func (user_connection *UserConnection) Listen() {
 		}
 		user_connection.active = true
 
-		messages_channel, connection := GetUndeliveredMessage(user_connection.UserId)
+		messages_channel, channel := GetUndeliveredMessage(registry.connection, user_connection.UserId)
 		if is_new_user := registry.Register(user_connection); is_new_user {
 			messages := make(chan []byte)
 			go func() {
@@ -42,7 +42,7 @@ func (user_connection *UserConnection) Listen() {
 						messages <- m.Body
 						m.Ack(false)
 					case <-time.After(20 * time.Second):
-						connection.Close()
+						channel.Close()
 						close(messages)
 						return
 					}

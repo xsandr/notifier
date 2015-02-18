@@ -12,7 +12,7 @@ func check_error(err error) {
 	}
 }
 
-func GetMessagesChannel() <-chan amqp.Delivery {
+func GetMessagesChannel() (<-chan amqp.Delivery, *amqp.Connection) {
 	connection, err := amqp.Dial(*rabbit)
 	check_error(err)
 	channel, err := connection.Channel()
@@ -49,21 +49,19 @@ func GetMessagesChannel() <-chan amqp.Delivery {
 		queue.Name, // name
 		"",         // consumerTag,
 		false,      // noAck
-		false,      // exclusive
+		true,       // exclusive
 		false,      // noLocal
 		false,      // noWait
 		nil,        // arguments
 	)
 	check_error(err)
-	return deliveries
+	return deliveries, connection
 }
 
-func PublishUndeliveredMessage(user_id int, message []byte, ttl int64) {
-	connection, err := amqp.Dial(*rabbit)
-	defer connection.Close()
-	check_error(err)
+func PublishUndeliveredMessage(connection *amqp.Connection, user_id int, message []byte, ttl int64) {
 	channel, err := connection.Channel()
 	check_error(err)
+	defer channel.Close()
 	key := fmt.Sprintf("undelivered.user.%d", user_id)
 	err = channel.ExchangeDeclare(
 		*exchange,
@@ -103,9 +101,7 @@ func PublishUndeliveredMessage(user_id int, message []byte, ttl int64) {
 	})
 }
 
-func GetUndeliveredMessage(user_id int) (<-chan amqp.Delivery, *amqp.Connection) {
-	connection, err := amqp.Dial(*rabbit)
-	check_error(err)
+func GetUndeliveredMessage(connection *amqp.Connection, user_id int) (<-chan amqp.Delivery, *amqp.Channel) {
 	channel, err := connection.Channel()
 	check_error(err)
 
@@ -138,5 +134,5 @@ func GetUndeliveredMessage(user_id int) (<-chan amqp.Delivery, *amqp.Connection)
 		nil,        // arguments
 	)
 	check_error(err)
-	return deliveries, connection
+	return deliveries, channel
 }
