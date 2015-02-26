@@ -27,7 +27,9 @@ func (registry *Regestry) ListenRabbit() {
 		user_id, _ := strconv.Atoi(matches[len(matches)-1])
 		ws_connection, ok := registry.GetConnection(user_id)
 		log.Printf("Message for user(is online - %v) %d: '%s'", ok, user_id, string(message.Body))
-		if ok == false && *defatul_ttl > 0 {
+		if ok {
+			ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
+		} else if *defatul_ttl > 0 {
 			ttl := *defatul_ttl
 			if ttl_header, ok := message.Headers["ttl"]; ok && ttl_header != nil {
 				if ttl_int, ok := ttl_header.(int32); ok {
@@ -36,7 +38,7 @@ func (registry *Regestry) ListenRabbit() {
 			}
 			PublishUndeliveredMessage(connection, user_id, message.Body, ttl)
 		} else {
-			ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
+			log.Print("but TTL disabled")
 		}
 	}
 }
