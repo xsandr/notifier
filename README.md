@@ -7,7 +7,7 @@ Simple WebSocket notifications through RabbitMQ
 
 Run notifier:
 ```
-go run *.go --addr=:5000 --debug=true
+go run *.go --addr=:5000
 ```
 
 Go to [notification page](http://localhost:5000/) and enter your ID

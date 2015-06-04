@@ -2,53 +2,39 @@ package main
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 type UserConnection struct {
-	UserId int
-	ws     *websocket.Conn
-	active bool
+	UID int
+	ws  *websocket.Conn
 }
 
-func (user_connection *UserConnection) Listen() {
+func NewUserConnection(ws *websocket.Conn) *UserConnection {
+	return &UserConnection{ws: ws}
+}
+
+func (u *UserConnection) Send(m Message) {
+	u.ws.WriteMessage(websocket.TextMessage, []byte(m.Message))
+}
+
+func (uc *UserConnection) Listen() {
 	defer func() {
-		user_connection.ws.Close()
-		if user_connection.active {
-			registry.Unregister(user_connection)
-		}
+		uc.ws.Close()
+		registry.Unregister(uc)
 	}()
 
 	for {
-		_, message, err := user_connection.ws.ReadMessage()
+		_, message, err := uc.ws.ReadMessage()
 		if err != nil {
 			break
 		}
-		user_connection.UserId, err = strconv.Atoi(string(message))
+		uid, err := strconv.Atoi(string(message))
 		if err != nil {
 			continue
 		}
-		user_connection.active = true
-
-		messages_channel, channel := GetUndeliveredMessage(registry.connection, user_connection.UserId)
-		if is_new_user := registry.Register(user_connection); is_new_user {
-			messages := make(chan []byte)
-			go func() {
-				for {
-					select {
-					case m := <-messages_channel:
-						messages <- m.Body
-						m.Ack(false)
-					case <-time.After(20 * time.Second):
-						channel.Close()
-						close(messages)
-						return
-					}
-				}
-			}()
-			go registry.SendUndeliveredMessages(user_connection.UserId, messages)
-		}
+		uc.UID = uid
+		registry.Register(uc)
 	}
 }

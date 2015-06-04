@@ -2,101 +2,87 @@ package main
 
 import (
 	"log"
-	"strconv"
 	"sync"
-
-	"github.com/gorilla/websocket"
-	"github.com/streadway/amqp"
 )
 
 type Regestry struct {
 	sync.RWMutex
-	connection  *amqp.Connection
 	connections map[int][]*UserConnection
+	Consumer    *Consumer
 }
 
-func (registry *Regestry) ListenRabbit() {
-	message_delivery, connection := GetMessagesChannel()
-	registry.connection = connection
-	for message := range message_delivery {
-		message.Ack(false)
-		matches := re.FindStringSubmatch(message.RoutingKey)
-		if len(matches) == 0 {
-			continue
-		}
-		user_id, _ := strconv.Atoi(matches[len(matches)-1])
-		ws_connection, ok := registry.GetConnection(user_id)
-		log.Printf("Message for user(is online - %v) %d: '%s'", ok, user_id, string(message.Body))
-		if ok {
-			ws_connection.ws.WriteMessage(websocket.TextMessage, message.Body)
-		} else if *defatul_ttl > 0 {
-			ttl := *defatul_ttl
-			if ttl_header, ok := message.Headers["ttl"]; ok && ttl_header != nil {
-				if ttl_int, ok := ttl_header.(int32); ok {
-					ttl = int64(ttl_int)
-				}
-			}
-			PublishUndeliveredMessage(connection, user_id, message.Body, ttl)
-		} else {
-			log.Print("but TTL disabled")
+func NewRegistry() *Regestry {
+	consumer := NewConsumer()
+	go consumer.Run()
+	return &Regestry{
+		connections: make(map[int][]*UserConnection),
+		Consumer:    consumer,
+	}
+}
+
+func (r *Regestry) ListenAndSendMessages() {
+	for message := range r.GetMessages() {
+		if user_connection, ok := r.GetConnection(message.UID); ok {
+			user_connection.Send(message)
+		} else if is_ttl_enabled {
+			r.SendUndeliveredMessages(message)
 		}
 	}
 }
 
-// Sending undelivered messages through WS
-func (registry *Regestry) SendUndeliveredMessages(user_id int, messages chan []byte) {
-	for message := range messages {
-		if ws_connection, ok := registry.GetConnection(user_id); ok {
-			log.Printf("Undelivered message for user(is online - %v) %d: '%s'", ok, user_id, string(message))
-			ws_connection.ws.WriteMessage(websocket.TextMessage, message)
-		}
+func (r *Regestry) GetMessages() chan Message {
+	return r.Consumer.Messages
+}
+
+func (r *Regestry) SendUndeliveredMessages(m Message) {
+	r.Consumer.PublishUndeliveredMessage(m)
+}
+
+// Returns user connection, and
+func (r *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
+	r.Lock()
+	defer r.Unlock()
+
+	if ws_connections, ok := r.connections[user_id]; ok {
+		return ws_connections[0], true
+	}
+	return nil, false
+}
+
+func (r *Regestry) Register(uc *UserConnection) {
+	r.Lock()
+	defer r.Unlock()
+	_, ok := r.connections[uc.UID]
+	if ok == false {
+		r.connections[uc.UID] = make([]*UserConnection, 0)
+	}
+	r.connections[uc.UID] = append(r.connections[uc.UID], uc)
+	log.Printf("User %d registered", uc.UID)
+	log.Printf("Connections %d", len(r.connections))
+
+	if ok == false && is_ttl_enabled {
+		log.Printf("Go to check undelivered message for user %d", uc.UID)
+		r.Consumer.GetUndeliveredMessage(uc.UID)
 	}
 }
 
-func (registry *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
-	registry.Lock()
-	defer registry.Unlock()
-	ws_connections, ok := registry.connections[user_id]
-	log.Printf("User %d have %d active connection", user_id, len(ws_connections))
-	if ok == false || len(ws_connections) == 0 {
-		return nil, false
-	}
-	return ws_connections[0], true
-}
-
-func (registry *Regestry) Register(uc *UserConnection) bool {
-	registry.Lock()
-	defer registry.Unlock()
-	connectionsCount.Add(1)
-	log.Printf("User %d: register", uc.UserId)
-	first_connection := false
-	if _, ok := registry.connections[uc.UserId]; ok == false {
-		usersCount.Add(1)
-		first_connection = true
-		registry.connections[uc.UserId] = make([]*UserConnection, 0)
-	}
-	registry.connections[uc.UserId] = append(registry.connections[uc.UserId], uc)
-	return first_connection
-}
-
-func (registry *Regestry) Unregister(uc *UserConnection) {
-	registry.Lock()
-	log.Printf("User %d: unregister", uc.UserId)
-	if _, ok := registry.connections[uc.UserId]; ok {
+func (r *Regestry) Unregister(uc *UserConnection) {
+	r.Lock()
+	defer r.Unlock()
+	if _, ok := r.connections[uc.UID]; ok {
 		var index int = 0
-		for i := 0; i < len(registry.connections[uc.UserId]); i++ {
-			if registry.connections[uc.UserId][i] == uc {
+		user_connections := r.connections[uc.UID]
+		for i := 0; i < len(user_connections); i++ {
+			if user_connections[i] == uc {
 				index = i
 				break
 			}
 		}
-		registry.connections[uc.UserId] = append(registry.connections[uc.UserId][:index], registry.connections[uc.UserId][index+1:]...)
+		r.connections[uc.UID] = append(user_connections[:index], user_connections[index+1:]...)
 
-		connectionsCount.Add(-1)
-		if len(registry.connections[uc.UserId]) == 0 {
-			usersCount.Add(-1)
-			delete(registry.connections, uc.UserId)
+		if len(r.connections[uc.UID]) == 0 {
+			delete(r.connections, uc.UID)
+			log.Printf("User %d leave", uc.UID)
 		}
 	}
-	registry.Unlock()
 }
