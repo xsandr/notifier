@@ -5,51 +5,57 @@ import (
 	"sync"
 )
 
-type Regestry struct {
+// Registry contains all web-socket connections
+type Registry struct {
 	sync.RWMutex
 	connections map[int][]*UserConnection
 	Consumer    *Consumer
 }
 
-func NewRegistry() *Regestry {
+// NewRegistry creates new Registry
+func NewRegistry() *Registry {
 	consumer := NewConsumer()
 	go consumer.Run()
-	return &Regestry{
+	return &Registry{
 		connections: make(map[int][]*UserConnection),
 		Consumer:    consumer,
 	}
 }
 
-func (r *Regestry) ListenAndSendMessages() {
+// ListenAndSendMessages gets all messages from RabbitMQ and sends them to recipients
+func (r *Registry) ListenAndSendMessages() {
 	for message := range r.GetMessages() {
-		if user_connection, ok := r.GetConnection(message.UID); ok {
-			user_connection.Send(message)
-		} else if is_ttl_enabled {
+		if userConnection, ok := r.GetConnection(message.UID); ok {
+			userConnection.Send(message)
+		} else if isTTLEnabled {
 			r.SendUndeliveredMessages(message)
 		}
 	}
 }
 
-func (r *Regestry) GetMessages() chan Message {
+// GetMessages returns Messages channel
+func (r *Registry) GetMessages() chan Message {
 	return r.Consumer.Messages
 }
 
-func (r *Regestry) SendUndeliveredMessages(m Message) {
+// SendUndeliveredMessages publish message for offline users
+func (r *Registry) SendUndeliveredMessages(m Message) {
 	r.Consumer.PublishUndeliveredMessage(m)
 }
 
-// Returns user connection, and
-func (r *Regestry) GetConnection(user_id int) (*UserConnection, bool) {
+// GetConnection returns UserConnection for uid
+func (r *Registry) GetConnection(uid int) (*UserConnection, bool) {
 	r.Lock()
 	defer r.Unlock()
 
-	if ws_connections, ok := r.connections[user_id]; ok {
-		return ws_connections[0], true
+	if wsConnetions, ok := r.connections[uid]; ok {
+		return wsConnetions[0], true
 	}
 	return nil, false
 }
 
-func (r *Regestry) Register(uc *UserConnection) {
+// Register add user connection to Registry
+func (r *Registry) Register(uc *UserConnection) {
 	r.Lock()
 	defer r.Unlock()
 	_, ok := r.connections[uc.UID]
@@ -60,25 +66,26 @@ func (r *Regestry) Register(uc *UserConnection) {
 	log.Printf("User %d registered", uc.UID)
 	log.Printf("Connections %d", len(r.connections))
 
-	if ok == false && is_ttl_enabled {
+	if ok == false && isTTLEnabled {
 		log.Printf("Go to check undelivered message for user %d", uc.UID)
 		r.Consumer.GetUndeliveredMessage(uc.UID)
 	}
 }
 
-func (r *Regestry) Unregister(uc *UserConnection) {
+// Unregister remove user ws connection from Registry, when user leaves
+func (r *Registry) Unregister(uc *UserConnection) {
 	r.Lock()
 	defer r.Unlock()
 	if _, ok := r.connections[uc.UID]; ok {
-		var index int = 0
-		user_connections := r.connections[uc.UID]
-		for i := 0; i < len(user_connections); i++ {
-			if user_connections[i] == uc {
+		var index int
+		userConnections := r.connections[uc.UID]
+		for i := 0; i < len(userConnections); i++ {
+			if userConnections[i] == uc {
 				index = i
 				break
 			}
 		}
-		r.connections[uc.UID] = append(user_connections[:index], user_connections[index+1:]...)
+		r.connections[uc.UID] = append(userConnections[:index], userConnections[index+1:]...)
 
 		if len(r.connections[uc.UID]) == 0 {
 			delete(r.connections, uc.UID)

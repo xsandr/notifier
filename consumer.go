@@ -10,6 +10,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Consumer is listening RabbitMQ and send messages to Registry
 type Consumer struct {
 	Messages            chan Message
 	UndeliveredMessages chan Message
@@ -17,10 +18,14 @@ type Consumer struct {
 	connection *amqp.Connection
 }
 
+// NewConsumer is constructor for Consumer
 func NewConsumer() *Consumer {
 	return &Consumer{Messages: make(chan Message), UndeliveredMessages: make(chan Message)}
 }
 
+// Run starts two goroutine
+// first is listening RabbitMQ for new messages
+// second - publishes messages for offline users
 func (c *Consumer) Run() {
 	conn, err := amqp.Dial(*rabbit)
 	if err != nil {
@@ -29,42 +34,45 @@ func (c *Consumer) Run() {
 	c.connection = conn
 
 	go c.GetMessages()
-	go c.publish_messages()
+	go c.publishMessages()
 }
 
+// GetMessages listens RabbitMQ and send new messages into Messages channel
 func (c *Consumer) GetMessages() {
 	channel := c.GetChannel()
 	defer channel.Close()
 
 	err := channel.ExchangeDeclare(*exchange, "topic", false, false, false, false, nil)
-	check_error(err)
+	checkError(err)
 	for message := range c.GetDeliveries(*queue, *routing, channel) {
-		parsed_message, err := ParseMessage(message)
+		parsedMessage, err := ParseMessage(message)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		c.Messages <- *parsed_message
+		c.Messages <- *parsedMessage
 	}
 }
 
+// PublishUndeliveredMessage publishes for offline users
 func (c *Consumer) PublishUndeliveredMessage(message Message) {
 	c.UndeliveredMessages <- message
 }
 
-func (c *Consumer) publish_messages() {
+// publishMessages publishes messages into queue undelivered.user.<UID>
+func (c *Consumer) publishMessages() {
 	channel := c.GetChannel()
 	defer channel.Close()
 	err := channel.ExchangeDeclare(*exchange, "topic", false, false, false, false, nil)
-	check_error(err)
+	checkError(err)
 
 	for message := range c.UndeliveredMessages {
 		log.Printf("Get undelivered message for user %d: %s", message.UID, message.Message)
 		key := fmt.Sprintf("undelivered.user.%d", message.UID)
 		_, err = channel.QueueDeclare(key, false, false, false, false, nil)
-		check_error(err)
+		checkError(err)
 		err = channel.QueueBind(key, key, *exchange, false, nil)
-		check_error(err)
+		checkError(err)
 
 		channel.Publish(*exchange, key, false, false, amqp.Publishing{
 			Headers:         amqp.Table{},
@@ -78,6 +86,7 @@ func (c *Consumer) publish_messages() {
 	}
 }
 
+// GetChannel returns new AMQP channel
 func (c *Consumer) GetChannel() *amqp.Channel {
 	channel, err := c.connection.Channel()
 	if err != nil {
@@ -86,12 +95,13 @@ func (c *Consumer) GetChannel() *amqp.Channel {
 	return channel
 }
 
-func check_error(err error) {
+func checkError(err error) {
 	if err != nil {
 		log.Println("Check your RabbitMQ connection!")
 	}
 }
 
+// GetUndeliveredMessage get new AMQP channel and gets all undelivered messages for UID
 func (c *Consumer) GetUndeliveredMessage(uid int) {
 	go func(uid int) {
 		qname := fmt.Sprintf("undelivered.user.%d", uid)
@@ -102,12 +112,12 @@ func (c *Consumer) GetUndeliveredMessage(uid int) {
 		for {
 			select {
 			case message := <-c.GetDeliveries(qname, qname, channel):
-				parsed_message, err := ParseMessage(message)
+				parsedMessage, err := ParseMessage(message)
 				if err != nil {
 					log.Println(err)
 					continue
 				}
-				c.Messages <- *parsed_message
+				c.Messages <- *parsedMessage
 			case <-ticker.C:
 				queue, err := channel.QueueInspect(qname)
 				if err != nil || queue.Messages == 0 {
@@ -119,18 +129,20 @@ func (c *Consumer) GetUndeliveredMessage(uid int) {
 	}(uid)
 }
 
+// GetDeliveries returns channel with messages from RabbitMQ, for particular queue
 func (c *Consumer) GetDeliveries(qname, routing string, channel *amqp.Channel) <-chan amqp.Delivery {
 	queue, err := channel.QueueDeclare(qname, false, false, false, false, nil)
-	check_error(err)
+	checkError(err)
 
 	err = channel.QueueBind(queue.Name, routing, *exchange, false, nil)
-	check_error(err)
+	checkError(err)
 
 	deliveries, err := channel.Consume(queue.Name, "", false, false, false, false, nil)
-	check_error(err)
+	checkError(err)
 	return deliveries
 }
 
+// ParseMessage parses amqp.Delivery and returns Message instance
 func ParseMessage(message amqp.Delivery) (*Message, error) {
 	matches := re.FindStringSubmatch(message.RoutingKey)
 	if len(matches) == 0 {
@@ -140,11 +152,11 @@ func ParseMessage(message amqp.Delivery) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	var message_ttl int64 = 0
-	if ttl_header, ok := message.Headers["ttl"]; ok && ttl_header != nil {
-		if ttl_int, ok := ttl_header.(int32); ok {
-			message_ttl = int64(ttl_int)
+	var messageTTL int64
+	if ttlHeader, ok := message.Headers["ttl"]; ok && ttlHeader != nil {
+		if ttlInt, ok := ttlHeader.(int32); ok {
+			messageTTL = int64(ttlInt)
 		}
 	}
-	return &Message{uid, string(message.Body), message_ttl}, nil
+	return &Message{uid, string(message.Body), messageTTL}, nil
 }

@@ -6,27 +6,31 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// UserConnection represents user ws-connection and his UID
 type UserConnection struct {
 	UID int
 	ws  *websocket.Conn
 }
 
+// NewUserConnection constructor for UserConnection
 func NewUserConnection(ws *websocket.Conn) *UserConnection {
 	return &UserConnection{ws: ws}
 }
 
+// Send method deliver message on websocket
 func (u *UserConnection) Send(m Message) {
 	u.ws.WriteMessage(websocket.TextMessage, []byte(m.Message))
 }
 
-func (uc *UserConnection) Listen() {
+// Listen method listens ws-connection and tries to get user UID
+func (u *UserConnection) Listen() {
 	defer func() {
-		uc.ws.Close()
-		registry.Unregister(uc)
+		u.ws.Close()
+		registry.Unregister(u)
 	}()
 
 	for {
-		_, message, err := uc.ws.ReadMessage()
+		_, message, err := u.ws.ReadMessage()
 		if err != nil {
 			break
 		}
@@ -34,7 +38,7 @@ func (uc *UserConnection) Listen() {
 		if err != nil {
 			continue
 		}
-		uc.UID = uid
-		registry.Register(uc)
+		u.UID = uid
+		registry.Register(u)
 	}
 }

@@ -21,9 +21,9 @@ var (
 	certFile = flag.String("cert", "", "Cert for TLS")
 	keyFile  = flag.String("keyfile", "", "Key for TLS")
 
-	re             = regexp.MustCompile("user.(\\d+)")
-	registry       = NewRegistry()
-	is_ttl_enabled bool
+	re           = regexp.MustCompile("user.(\\d+)")
+	registry     = NewRegistry()
+	isTTLEnabled bool
 
 	homeTempl = template.Must(template.ParseFiles("index.html"))
 	upgrader  = websocket.Upgrader{
@@ -51,7 +51,7 @@ func serveMain(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
-	is_ttl_enabled = *ttl > 0
+	isTTLEnabled = *ttl > 0
 	go registry.ListenAndSendMessages()
 
 	http.HandleFunc("/", serveMain)
