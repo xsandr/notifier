@@ -25,11 +25,19 @@ func NewRegistry() *Registry {
 // ListenAndSendMessages gets all messages from RabbitMQ and sends them to recipients
 func (r *Registry) ListenAndSendMessages() {
 	for message := range r.GetMessages() {
-		if userConnection, ok := r.GetConnection(message.UID); ok {
-			userConnection.Send(message)
-		} else if isTTLEnabled {
+		r.Lock()
+		user_connections, isOnline := r.GetConnections(message.UID)
+		if !isOnline && message.TTL > 0 {
 			r.SendUndeliveredMessages(message)
+		} else {
+			for _, uc := range user_connections {
+				uc.Send(message)
+				if !message.AllUserConnection {
+					break
+				}
+			}
 		}
+		r.Unlock()
 	}
 }
 
@@ -44,14 +52,9 @@ func (r *Registry) SendUndeliveredMessages(m Message) {
 }
 
 // GetConnection returns UserConnection for uid
-func (r *Registry) GetConnection(uid int) (*UserConnection, bool) {
-	r.Lock()
-	defer r.Unlock()
-
-	if wsConnetions, ok := r.connections[uid]; ok {
-		return wsConnetions[0], true
-	}
-	return nil, false
+func (r *Registry) GetConnections(uid int) ([]*UserConnection, bool) {
+	user_connections, ok := r.connections[uid]
+	return user_connections, ok
 }
 
 // Register add user connection to Registry
@@ -64,9 +67,9 @@ func (r *Registry) Register(uc *UserConnection) {
 	}
 	r.connections[uc.UID] = append(r.connections[uc.UID], uc)
 	log.Printf("User %d registered", uc.UID)
-	log.Printf("Connections %d", len(r.connections))
+	log.Printf("Connections %d", len(r.connections[uc.UID]))
 
-	if ok == false && isTTLEnabled {
+	if ok == false {
 		log.Printf("Go to check undelivered message for user %d", uc.UID)
 		r.Consumer.GetUndeliveredMessage(uc.UID)
 	}

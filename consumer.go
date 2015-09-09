@@ -107,8 +107,8 @@ func (c *Consumer) GetUndeliveredMessage(uid int) {
 		qname := fmt.Sprintf("undelivered.user.%d", uid)
 		channel := c.GetChannel()
 		defer channel.Close()
+		// check every 5 sec - is queue empty?
 		ticker := time.NewTicker(5 * time.Second)
-
 		for {
 			select {
 			case message := <-c.GetDeliveries(qname, qname, channel):
@@ -121,6 +121,7 @@ func (c *Consumer) GetUndeliveredMessage(uid int) {
 			case <-ticker.C:
 				queue, err := channel.QueueInspect(qname)
 				if err != nil || queue.Messages == 0 {
+					log.Println("Queue is empty")
 					channel.Close()
 					return
 				}
@@ -144,6 +145,7 @@ func (c *Consumer) GetDeliveries(qname, routing string, channel *amqp.Channel) <
 
 // ParseMessage parses amqp.Delivery and returns Message instance
 func ParseMessage(message amqp.Delivery) (*Message, error) {
+	message.Ack(false)
 	matches := re.FindStringSubmatch(message.RoutingKey)
 	if len(matches) == 0 {
 		return nil, errors.New("Unknown routing key")
@@ -152,11 +154,15 @@ func ParseMessage(message amqp.Delivery) (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
+	all_user_connection := false
+	if _, ok := message.Headers["all_user_connection"]; ok {
+		all_user_connection = true
+	}
 	var messageTTL int64
 	if ttlHeader, ok := message.Headers["ttl"]; ok && ttlHeader != nil {
 		if ttlInt, ok := ttlHeader.(int32); ok {
 			messageTTL = int64(ttlInt)
 		}
 	}
-	return &Message{uid, string(message.Body), messageTTL}, nil
+	return &Message{uid, string(message.Body), messageTTL, all_user_connection}, nil
 }
