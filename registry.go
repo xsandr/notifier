@@ -93,3 +93,13 @@ func (r *Registry) Unregister(uc *UserConnection) {
 		}
 	}
 }
+
+func (r *Registry) GetOnlineUsers() []int {
+	r.Lock()
+	defer r.Unlock()
+	users := make([]int, 0)
+	for uid, _ := range r.connections {
+		users = append(users, uid)
+	}
+	return users
+}

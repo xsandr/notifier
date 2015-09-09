@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -49,12 +50,20 @@ func serveMain(w http.ResponseWriter, r *http.Request) {
 	homeTempl.Execute(w, r.Host)
 }
 
+func getOnlineUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json;")
+	users := registry.GetOnlineUsers()
+	json_data, _ := json.Marshal(users)
+	w.Write(json_data)
+}
+
 func main() {
 	flag.Parse()
 	isTTLEnabled = *ttl > 0
 	go registry.ListenAndSendMessages()
 
 	http.HandleFunc("/", serveMain)
+	http.HandleFunc("/online", getOnlineUsers)
 	http.HandleFunc("/ws", serveWs)
 	log.Print("Server started")
 	if *certFile != "" && *keyFile != "" {
